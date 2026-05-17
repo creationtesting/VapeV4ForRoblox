@@ -8267,7 +8267,7 @@ run(function()
   local timeConnection
   local ThemesModule = { Enabled = false }
   local ThemesDropdown = { Value = 'Antarctic Evening' }
-  ThemesModule = vape.Categories['Visuals']:CreateModule {
+  ThemesModule = vape.Categories['Render']:CreateModule {
     Name = 'Themes',
     Tooltip = 'Changes the theme',
     ExtraText = function()
