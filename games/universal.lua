@@ -544,14 +544,14 @@ run(function()
 		elseif replicatedStorage:FindFirstChild('DefaultChatSystemChatEvents') then
 			pcall(function()
 				for _, v in getconnections(replicatedStorage.DefaultChatSystemChatEvents.OnNewMessage.OnClientEvent) do
-					if v.Function and islclosure(v.Function) and table.find(debug.getconstants(v.Function), 'UpdateMessagePostedInChannel') then
+					if v.Function and table.find(debug.getconstants(v.Function), 'UpdateMessagePostedInChannel') then
 						whitelist:oldchat(v.Function)
 						break
 					end
 				end
 
 				for _, v in getconnections(replicatedStorage.DefaultChatSystemChatEvents.OnMessageDoneFiltering.OnClientEvent) do
-					if v.Function and islclosure(v.Function) and table.find(debug.getconstants(v.Function), 'UpdateMessageFiltered') then
+					if v.Function and table.find(debug.getconstants(v.Function), 'UpdateMessageFiltered') then
 						whitelist:oldchat(v.Function)
 						break
 					end
@@ -2252,101 +2252,22 @@ end)
 	
 run(function()
 	local Invisible
-	local clone, oldroot, hip, valid
+	local oldcf
 	local animtrack
 	local proper = true
 	
-	local function doClone()
-		if entitylib.isAlive and entitylib.character.Humanoid.Health > 0 then
-			hip = entitylib.character.Humanoid.HipHeight
-			oldroot = entitylib.character.HumanoidRootPart
-	
-			if not lplr.Character.Parent then
-				return false
-			end
-	
-			lplr.Character.Parent = game
-			clone = oldroot:Clone()
-			clone.Parent = lplr.Character
-			oldroot.Parent = gameCamera
-			clone.CFrame = oldroot.CFrame
-	
-			lplr.Character.PrimaryPart = clone
-			entitylib.character.HumanoidRootPart = clone
-			entitylib.character.RootPart = clone
-			lplr.Character.Parent = workspace
-	
-			for _, v in lplr.Character:GetDescendants() do
-				if v:IsA('Weld') or v:IsA('Motor6D') then
-					if v.Part0 == oldroot then
-						v.Part0 = clone
-					end
-					if v.Part1 == oldroot then
-						v.Part1 = clone
-					end
-				end
-			end
-	
-			return true
-		end
-	
-		return false
-	end
-	
-	local function revertClone()
-		if not oldroot or not oldroot:IsDescendantOf(workspace) or not entitylib.isAlive then
-			return false
-		end
-	
-		lplr.Character.Parent = game
-		oldroot.Parent = lplr.Character
-		lplr.Character.PrimaryPart = oldroot
-		entitylib.character.HumanoidRootPart = oldroot
-		entitylib.character.RootPart = oldroot
-		lplr.Character.Parent = workspace
-		oldroot.CanCollide = true
-	
-		for _, v in lplr.Character:GetDescendants() do
-			if v:IsA('Weld') or v:IsA('Motor6D') then
-				if v.Part0 == clone then
-					v.Part0 = oldroot
-				end
-				if v.Part1 == clone then
-					v.Part1 = oldroot
-				end
-			end
-		end
-	
-		local oldpos = clone.CFrame
-		if clone then
-			clone:Destroy()
-			clone = nil
-		end
-	
-		oldroot.CFrame = oldpos
-		oldroot = nil
-		entitylib.character.Humanoid.HipHeight = hip or 2
-	end
-	
 	local function animationTrickery()
 		if entitylib.isAlive then
+			local isR15 = entitylib.character.Humanoid.RigType == Enum.HumanoidRigType.R15
 			local anim = Instance.new('Animation')
-			anim.AnimationId = 'http://www.roblox.com/asset/?id=18537363391'
+			anim.AnimationId = 'rbxassetid://'..(isR15 and '18537363391' or '215384594')
 			animtrack = entitylib.character.Humanoid.Animator:LoadAnimation(anim)
 			animtrack.Priority = Enum.AnimationPriority.Action4
-			animtrack:Play(0, 1, 0)
+			animtrack:Play(0, 0.001, 0)
 			anim:Destroy()
-			animtrack.Stopped:Connect(function()
-				if Invisible.Enabled then
-					animationTrickery()
-				end
-			end)
 	
 			task.delay(0, function()
-				animtrack.TimePosition = 0.77
-				task.delay(1, function()
-					animtrack:AdjustSpeed(math.huge)
-				end)
+				animtrack.TimePosition = isR15 and 0.77 or 0.38
 			end)
 		end
 	end
@@ -2355,33 +2276,29 @@ run(function()
 		Name = 'Invisible',
 		Function = function(callback)
 			if callback then
-				if not proper then
-					notif('Invisible', 'Broken state detected', 3, 'alert')
-					Invisible:Toggle()
-					return
-				end
-	
-				success = doClone()
-				if not success then
-					Invisible:Toggle()
-					return
-				end
-	
 				animationTrickery()
-				Invisible:Clean(runService.PreSimulation:Connect(function(dt)
-					if entitylib.isAlive and oldroot then
+	
+				local bindKey = httpService:GenerateGUID(true)
+				runService:BindToRenderStep(bindKey, 0, function()
+					if entitylib.isAlive and oldcf then
+						entitylib.character.RootPart.CFrame = oldcf
+						animtrack:AdjustWeight(0.001)
+					end
+				end)
+	
+				Invisible:Clean(function()
+					runService:UnbindFromRenderStep(bindKey)
+				end)
+	
+				Invisible:Clean(runService.Heartbeat:Connect(function(dt)
+					if entitylib.isAlive then
+						local isR15 = entitylib.character.Humanoid.RigType == Enum.HumanoidRigType.R15
 						local root = entitylib.character.RootPart
 						local cf = root.CFrame - Vector3.new(0, entitylib.character.Humanoid.HipHeight + (root.Size.Y / 2) - 1, 0)
+						oldcf = root.CFrame
 	
-						if not isnetworkowner(oldroot) then
-							root.CFrame = oldroot.CFrame
-							root.Velocity = oldroot.Velocity
-							return
-						end
-	
-						oldroot.CFrame = cf * CFrame.Angles(math.rad(180), 0, 0)
-						oldroot.Velocity = root.Velocity
-						oldroot.CanCollide = false
+						root.CFrame = cf * CFrame.Angles(math.rad(isR15 and 180 or 90), 0, 0)
+						animtrack:AdjustWeight(100)
 					end
 				end))
 	
@@ -2399,11 +2316,8 @@ run(function()
 					animtrack:Destroy()
 				end
 	
-				if success and clone and oldroot and proper then
-					proper = true
-					if oldroot and clone then
-						revertClone()
-					end
+				if entitylib.isAlive and oldcf then
+					entitylib.character.RootPart.CFrame = oldcf
 				end
 			end
 		end,
@@ -3826,6 +3740,7 @@ run(function()
 						end
 					end
 				end))
+	
 				for _, v in entitylib.List do
 					if Reference[v] then
 						Removed(v)
@@ -3880,7 +3795,7 @@ run(function()
 		Function = function(hue, sat, val)
 			for i, v in Reference do
 				if type(v) ~= 'table' then
-					v.OutlineColor = entitylib.getEntityColor(i) or Color3.fromHSV(hue, sat, val)
+					v.OutlineColor = Color3.fromHSV(hue, sat, val)
 				end
 			end
 		end,
@@ -4480,6 +4395,68 @@ run(function()
 		DefaultMax = 64,
 		Darker = true,
 		Visible = false
+	})
+end)
+	
+run(function()
+	local Fullbright
+	local Mode
+	local oldsettings = {}
+	local flag
+	
+	local function ChangeLighting(prop)
+		if flag then
+			return
+		end
+	
+		flag = true
+		lightingService.Ambient = Color3.new(1, 1, 1)
+		lightingService.OutdoorAmbient = Color3.new(1, 1, 1)
+		lightingService.Brightness = 3
+		runService.RenderStepped:Wait()
+		flag = false
+	end
+	
+	Fullbright = vape.Categories.Render:CreateModule({
+		Name = 'Fullbright',
+		Function = function(callback)
+			if callback then
+				if Mode.Value == 'Lighting' then
+					for _, v in {'Ambient', 'OutdoorAmbient', 'Brightness'} do
+						oldsettings[v] = lightingService[v]
+					end
+	
+					Fullbright:Clean(lightingService.Changed:Connect(ChangeLighting))
+					task.spawn(ChangeLighting)
+				else
+					local inst = Instance.new('PointLight')
+					inst.Range = 1000
+					Fullbright:Clean(inst)
+	
+					repeat
+						inst.Parent = entitylib.isAlive and entitylib.character.RootPart or nil
+						task.wait(0.1)
+					until not Fullbright.Enabled
+				end
+			else
+				flag = false
+				for i, v in oldsettings do
+					lightingService[i] = v
+				end
+				table.clear(oldsettings)
+			end
+		end,
+		Tooltip = 'Increase the lighting of the world around you.'
+	})
+	Mode = Fullbright:CreateDropdown({
+		Name = 'Mode',
+		List = {'Lighting', 'PointLight'},
+		Function = function()
+			if Fullbright.Enabled then
+				Fullbright:Toggle()
+				Fullbright:Toggle()
+			end
+		end
 	})
 end)
 	
@@ -6630,7 +6607,7 @@ run(function()
 				repeat
 					task.wait(0.1)
 					for _, v in getconnections(gameCamera:GetPropertyChangedSignal('CameraType')) do
-						if v.Function and islclosure(v.Function) then
+						if v.Function then
 							module = debug.getupvalue(v.Function, 1)
 						end
 					end

@@ -24,10 +24,15 @@ run(function()
 	bt = {
 		Ambassador = require(replicatedFirst.Ambassador),
 		BattleClient = getsenv(lplr.PlayerScripts.Battle.BattleClient),
+		Enemy = require(replicatedFirst.Classes.Entities.Enemy),
 		Network = require(replicatedFirst.Network),
 		Shucky = require(replicatedFirst.Modules.Shucky),
 		Variables = require(replicatedFirst.Variables)
 	}
+
+	vape:Clean(function()
+		table.clear(bt)
+	end)
 end)
 
 for _, v in {'AimAssist', 'Reach', 'SilentAim', 'TriggerBot', 'AntiFall', 'HitBoxes', 'Invisible', 'Jesus', 'Killaura', 'TargetStrafe', 'AntiRagdoll', 'Disabler', 'MurderMystery', 'Freecam', 'ChatSpammer', 'SpinBot'} do
@@ -248,6 +253,22 @@ run(function()
 end)
 	
 run(function()
+	local FlyingAttack
+	
+	FlyingAttack = vape.Categories.Blatant:CreateModule({
+		Name = 'FlyingAttack',
+		Function = function(callback)
+			if callback then
+				debug.setconstant(bt.Shucky.PossibleFirst, 7, '_Flying')
+			else
+				debug.setconstant(bt.Shucky.PossibleFirst, 7, 'Flying')
+			end
+		end,
+		Tooltip = 'Allow you to attack flying enemies with onground attacks.'
+	})
+end)
+	
+run(function()
 	local Value
 	local AutoDisable
 	
@@ -302,22 +323,38 @@ run(function()
 	local PickupTP
 	
 	PickupTP = vape.Categories.Blatant:CreateModule({
-	    Name = 'PickupTP',
-	    Function = function(callback)
-	        if callback then
-	            PickupTP:Toggle()
+		Name = 'PickupTP',
+		Function = function(callback)
+			if callback then
+				local old
+				repeat
+					if entitylib.isAlive then
+						local success = true
+						for _, v in collectionService:GetTagged('Pickup') do
+							if not v:GetAttribute('Inactive') then
+								if not old then
+									old = entitylib.character.RootPart.CFrame
+								end
 	
-	            if entitylib.isAlive then
-	                for _, v in collectionService:GetTagged('Pickup') do
-	                    if not v:GetAttribute('Inactive') then
-	                        entitylib.character.RootPart.CFrame = v.CFrame
-	                        break
-	                    end
-	                end
-	            end
-	        end
-	    end,
-	    Tooltip = 'Teleport to any nearby active pickups.'
+								success = false
+								entitylib.character.RootPart.CFrame = v.CFrame
+								break
+							end
+						end
+	
+						if success and old then
+							entitylib.character.RootPart.CFrame = old
+							old = nil
+						end
+					else
+						old = nil
+					end
+	
+					task.wait(0.4)
+				until not PickupTP.Enabled
+			end
+		end,
+		Tooltip = 'Teleport to any nearby active pickups.'
 	})
 end)
 	
@@ -549,7 +586,43 @@ run(function()
 end)
 	
 run(function()
+	local AutoCloudGrind
+	
+	AutoCloudGrind = vape.Categories.Minigames:CreateModule({
+		Name = 'AutoCloudGrind',
+		Function = function(callback)
+			if callback then
+				repeat
+					if bt.Variables.arena and bt.Variables.arena:GetAttribute('State') == 'Picking' then
+						local doRun = true
+						for _, v in bt.Variables.arena.Goon:GetChildren() do
+							local drop = v.Value and v.Value:GetAttribute('Item_Drop')
+	
+							if drop and drop:find('FX ') and not bt.Variables.data.CardCollection[drop] then
+								doRun = false
+							end
+						end
+	
+						if doRun then
+							bt.Network.FireServer('CommitToMove', 'Run Away', nil, nil)
+							task.wait(3)
+						else
+							workspace.Sounds.Money:Play()
+							workspace.Sounds.Money.Ended:Wait()
+						end
+					end
+	
+					task.wait(0.05)
+				until not AutoCloudGrind.Enabled
+			end
+		end,
+		Tooltip = 'Automatically grind for SFX Cards from Cloudie (floor 51)'
+	})
+end)
+	
+run(function()
 	local AutoFish
+	local KeepList
 	local old
 	
 	AutoFish = vape.Categories.Minigames:CreateModule({
@@ -570,7 +643,10 @@ run(function()
 					local fish = lplr.Status:GetAttribute('NextFish')
 					local res = bt.Network.InvokeServer('FishItem')
 					if res == true then
-						bt.Network.InvokeServer('UseItem', fish, fishman)
+						if not table.find(KeepList.ListEnabled, fish) then
+							bt.Network.InvokeServer('UseItem', fish, fishman)
+						end
+	
 						bt.Network.InvokeServer('BuyItem', fishman.ShopItems:GetChildren()[1], fishman)
 					end
 	
@@ -583,6 +659,10 @@ run(function()
 			end
 		end,
 		Tooltip = 'Automatically sell and buy fish'
+	})
+	KeepList = AutoFish:CreateTextList({
+		Name = 'Keep List',
+		Placeholder = 'item'
 	})
 end)
 	
